@@ -99,6 +99,7 @@ function AWSIAMCredentials:loadCredentialsFromSharedDict()
         cache.IMDSv2Token = iamCreds.IMDSv2Token
         cache.ExpireAt = iamCreds.ExpireAt
         cache.ExpireAtTimestamp = iamCreds.ExpireAtTimestamp
+        cache.ExpireIMDSv2AtTimestamp = iamCreds.ExpireIMDSv2AtTimestamp
         ngx.log(ngx.DEBUG, "Cache has been loaded from Shared Cache" )
     end
 end
@@ -111,7 +112,7 @@ function AWSIAMCredentials:fetchIamUser()
     
 -- Retrieves the token needed for request under IMDSV2 
     self:retrieveIMDSv2Token()
-    
+
     local hc1 = http:new()
 
     local ok, code, headers, status, body = hc1:request{
@@ -151,7 +152,7 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
 
 -- Retrieves the token needed for request under IMDSV2 
     self:retrieveIMDSv2Token()
-    
+
     local hc1 = http:new()
 
     local ok, code, headers, status, body = hc1:request{
@@ -207,6 +208,7 @@ function AWSIAMCredentials:getSecurityCredentials()
     return cache.AccessKeyId, cache.SecretAccessKey, cache.Token, cache.ExpireAt, cache.ExpireAtTimestamp
 end
 
+-- Retrieves a IMDSv2 Token if it hasn't been done yet or if the previous token has expired
 function AWSIAMCredentials:retrieveIMDSv2Token()
 
     if (cache.ExpireIMDSv2AtTimestamp == nil or cache.ExpireIMDSv2AtTimestamp - os.time() <= 0 ) then
