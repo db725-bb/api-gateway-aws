@@ -31,7 +31,8 @@ local cache = {
     Token = nil,
     IMDSv2Token = nil,    
     ExpireAt = nil,
-    ExpireAtTimestamp = nil
+    ExpireAtTimestamp = nil,
+    ExpireIMDSv2AtTimestamp = nil
 }
 
 local function tableToString(table_ref)
@@ -125,10 +126,6 @@ function AWSIAMCredentials:fetchIamUser()
         poolsize = 50
     }
     
-    if (code == ngx.HTTP_UNAUTHORIZED) then
-       cache.IMDSv2Token = nil
-    end
-
     if (code == ngx.HTTP_OK and body ~= nil) then
         cache.IamUser = body
         ngx.log(ngx.DEBUG, "found user:" .. tostring(body))
@@ -169,10 +166,6 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         poolsize = 50
     }
     
-    if (code == ngx.HTTP_UNAUTHORIZED) then
-       cache.IMDSv2Token = nil
-    end
-
     ngx.log(ngx.DEBUG, "AWS Response:" .. tostring(body))
 
     local aws_response = cjson.decode(body)
@@ -216,7 +209,7 @@ end
 
 function AWSIAMCredentials:retrieveIMDSv2Token()
 
-    if (cache.IMDSv2Token == nil) then        
+    if (cache.ExpireIMDSv2AtTimestamp == nil or cache.ExpireIMDSv2AtTimestamp - os.time() <= 0 ) then
         ngx.log(ngx.DEBUG, "Retrieving IMDSv2 Token")
 
     	local hc1 = http:new()
