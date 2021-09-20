@@ -15,8 +15,10 @@ local cacheCls = require "api-gateway.cache.cache"
 local DEFAULT_SECURITY_CREDENTIALS_HOST = "169.254.169.254"
 local DEFAULT_SECURITY_CREDENTIALS_PORT = "80"
 local DEFAULT_SECURITY_CREDENTIALS_URL = "/latest/meta-data/iam/security-credentials/"
+local DEFAULT_IMDSV2_TOKEN_URL = "/latest/api/token"
 -- use GET /latest/meta-data/iam/security-credentials/ to auto-discover the IAM Role
 local DEFAULT_TOKEN_EXPIRATION = 60*60*24 -- in seconds
+local DEFAULT_IMDSV2_TOKEN_EXPIRATION = 60*60*6 -- in seconds
 
 -- configure cache Manager for IAM crendentials
 local iamCache = cacheCls:new()
@@ -27,8 +29,10 @@ local cache = {
     AccessKeyId = nil,
     SecretAccessKey = nil,
     Token = nil,
+    IMDSv2Token = nil,    
     ExpireAt = nil,
-    ExpireAtTimestamp = nil
+    ExpireAtTimestamp = nil,
+    ExpireIMDSv2AtTimestamp = nil
 }
 
 local function tableToString(table_ref)
@@ -92,8 +96,10 @@ function AWSIAMCredentials:loadCredentialsFromSharedDict()
         cache.AccessKeyId = iamCreds.AccessKeyId
         cache.SecretAccessKey = iamCreds.SecretAccessKey
         cache.Token = iamCreds.Token
+        cache.IMDSv2Token = iamCreds.IMDSv2Token
         cache.ExpireAt = iamCreds.ExpireAt
         cache.ExpireAtTimestamp = iamCreds.ExpireAtTimestamp
+        cache.ExpireIMDSv2AtTimestamp = iamCreds.ExpireIMDSv2AtTimestamp
         ngx.log(ngx.DEBUG, "Cache has been loaded from Shared Cache" )
     end
 end
@@ -103,6 +109,10 @@ end
 function AWSIAMCredentials:fetchIamUser()
     ngx.log(ngx.DEBUG, "Fetching IAM User from:",
         self.security_credentials_host, ":", self.security_credentials_port, self.security_credentials_url)
+    
+    -- Retrieves the token needed for request under IMDSV2 
+    self:retrieveIMDSv2Token()
+
     local hc1 = http:new()
 
     local ok, code, headers, status, body = hc1:request{
@@ -110,6 +120,9 @@ function AWSIAMCredentials:fetchIamUser()
         port = self.security_credentials_port,
         url = self.security_credentials_url,
         method = "GET",
+        headers = {
+        	["X-aws-ec2-metadata-token"] = cache.IMDSv2Token
+        },
         keepalive = 30000, -- 30s keepalive
         poolsize = 50
     }
@@ -137,6 +150,9 @@ end
 function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
     local iamURL = self.security_credentials_url .. self:getIamUser() .. "?DurationSeconds=" .. self.security_credentials_timeout
 
+    -- Retrieves the token needed for request under IMDSV2 
+    self:retrieveIMDSv2Token()
+
     local hc1 = http:new()
 
     local ok, code, headers, status, body = hc1:request{
@@ -144,6 +160,9 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         port = self.security_credentials_port,
         url = iamURL,
         method = "GET",
+        headers = {
+        	["X-aws-ec2-metadata-token"] = cache.IMDSv2Token
+        },
         keepalive = 30000, -- 30s keepalive
         poolsize = 50
     }
@@ -187,6 +206,33 @@ function AWSIAMCredentials:getSecurityCredentials()
     end
 
     return cache.AccessKeyId, cache.SecretAccessKey, cache.Token, cache.ExpireAt, cache.ExpireAtTimestamp
+end
+
+-- Retrieves a IMDSv2 Token if it hasn't been done yet or if the previous token has expired
+function AWSIAMCredentials:retrieveIMDSv2Token()
+
+    if (cache.ExpireIMDSv2AtTimestamp == nil or cache.ExpireIMDSv2AtTimestamp - os.time() <= 10 ) then
+        ngx.log(ngx.DEBUG, "Retrieving IMDSv2 Token")
+
+    	local hc1 = http:new()
+
+    	local ok, code, headers, status, body = hc1:request{
+        	host = self.security_credentials_host,
+        	port = self.security_credentials_port,
+        	url = DEFAULT_IMDSV2_TOKEN_URL,
+        	method = "PUT",
+        	headers = {
+        		["X-aws-ec2-metadata-token-ttl-seconds"] = DEFAULT_IMDSV2_TOKEN_EXPIRATION,
+        	},
+        	keepalive = 30000, -- 30s keepalive
+        	poolsize = 50
+  	  	}  	  	 
+
+        if (code == ngx.HTTP_OK and body ~= nil) then
+            cache.IMDSv2Token = tostring(body)
+        end
+
+    end
 end
 
 return AWSIAMCredentials
