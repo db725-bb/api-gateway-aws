@@ -110,7 +110,7 @@ function AWSIAMCredentials:fetchIamUser()
     ngx.log(ngx.DEBUG, "Fetching IAM User from:",
         self.security_credentials_host, ":", self.security_credentials_port, self.security_credentials_url)
     
--- Retrieves the token needed for request under IMDSV2 
+    -- Retrieves the token needed for request under IMDSV2 
     self:retrieveIMDSv2Token()
 
     local hc1 = http:new()
@@ -150,7 +150,7 @@ end
 function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
     local iamURL = self.security_credentials_url .. self:getIamUser() .. "?DurationSeconds=" .. self.security_credentials_timeout
 
--- Retrieves the token needed for request under IMDSV2 
+    -- Retrieves the token needed for request under IMDSV2 
     self:retrieveIMDSv2Token()
 
     local hc1 = http:new()
@@ -211,7 +211,7 @@ end
 -- Retrieves a IMDSv2 Token if it hasn't been done yet or if the previous token has expired
 function AWSIAMCredentials:retrieveIMDSv2Token()
 
-    if (cache.ExpireIMDSv2AtTimestamp == nil or cache.ExpireIMDSv2AtTimestamp - os.time() <= 0 ) then
+    if (cache.ExpireIMDSv2AtTimestamp == nil or cache.ExpireIMDSv2AtTimestamp - os.time() <= 10 ) then
         ngx.log(ngx.DEBUG, "Retrieving IMDSv2 Token")
 
     	local hc1 = http:new()
