@@ -126,7 +126,7 @@ function AWSIAMCredentials:fetchIamUser()
         keepalive = 30000, -- 30s keepalive
         poolsize = 50
     }
-    
+
     if (code == ngx.HTTP_OK and body ~= nil) then
         cache.IamUser = body
         ngx.log(ngx.DEBUG, "found user:" .. tostring(body))
@@ -166,7 +166,7 @@ function AWSIAMCredentials:fetchSecurityCredentialsFromAWS()
         keepalive = 30000, -- 30s keepalive
         poolsize = 50
     }
-    
+
     ngx.log(ngx.DEBUG, "AWS Response:" .. tostring(body))
 
     local aws_response = cjson.decode(body)
